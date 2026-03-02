@@ -51,6 +51,22 @@ router.post('/:id/toggle', async (req, res) => {
     }
 });
 
+router.put('/:id', async (req, res) => {
+    try {
+        const { ip_servidor, puerto } = req.body;
+        if (!ip_servidor) {
+            return res.status(400).json({ status: 'error', message: 'La IP es obligatoria' });
+        }
+        await db.query(
+            'UPDATE servidores SET ip_servidor = $1, puerto = $2 WHERE id = $3',
+            [ip_servidor, puerto || '22003', req.params.id]
+        );
+        res.json({ status: 'success', message: 'Servidor actualizado correctamente' });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: 'Error al actualizar servidor' });
+    }
+});
+
 router.delete('/:id', async (req, res) => {
     try {
         await db.query('DELETE FROM servidores WHERE id = $1', [req.params.id]);
