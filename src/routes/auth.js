@@ -56,8 +56,8 @@ router.post('/login', async (req, res) => {
         }
         return res.json({ status: 'success', admin_id: admin.id, email: admin.email });
     } catch (err) {
-        console.error('Error en login:', err.message);
-        return res.status(500).json({ status: 'error', message: 'Error interno' });
+        console.error('Error en login:', err.message, err.stack);
+        return res.status(500).json({ status: 'error', message: 'Error interno: ' + err.message });
     }
 });
 

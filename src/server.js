@@ -44,6 +44,40 @@ app.get('/', (req, res) => {
         }
     });
 });
+
+// Endpoint de diagnóstico
+app.get('/api/health', async (req, res) => {
+    try {
+        const dbConnected = await db.testConnection();
+        const config = {
+            hasDbUrl: !!process.env.DATABASE_URL,
+            dbHost: process.env.DB_HOST ? 'SET' : 'NOT SET',
+            dbUser: process.env.DB_USER ? 'SET' : 'NOT SET',
+            dbPass: process.env.DB_PASS ? 'SET' : 'NOT SET',
+            dbName: process.env.DB_NAME ? 'SET' : 'NOT SET',
+            dbSsl: process.env.DB_SSL || 'NOT SET'
+        };
+        
+        let tableCheck = null;
+        if (dbConnected) {
+            try {
+                const result = await db.query("SELECT COUNT(*) as total FROM admins");
+                tableCheck = { admins: parseInt(result[0]?.total || 0) };
+            } catch (e) {
+                tableCheck = { error: e.message };
+            }
+        }
+        
+        res.json({
+            status: dbConnected ? 'ok' : 'error',
+            database: dbConnected ? 'connected' : 'disconnected',
+            config,
+            tables: tableCheck
+        });
+    } catch (err) {
+        res.json({ status: 'error', message: err.message });
+    }
+});
 app.use((req, res) => {
     res.status(404).json({ status: 'error', message: 'Ruta no encontrada' });
 });
