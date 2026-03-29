@@ -61,11 +61,22 @@ router.get('/:id', async (req, res) => {
 });
 router.post('/', async (req, res) => {
     try {
-        const { nombre, ip_servidor, puerto, duracion } = req.body;
+        const { nombre, ip_servidor, puerto, duracion, custom_key } = req.body;
         if (!nombre || !ip_servidor) {
             return res.status(400).json({ status: 'error', message: 'Nombre e IP son obligatorios' });
         }
-        const key = generateKey();
+        
+        // Usar key personalizada si se proporciona, sino generar una nueva
+        let key = custom_key && custom_key.trim() !== '' ? custom_key.trim().toUpperCase() : generateKey();
+        
+        // Verificar si la key ya existe
+        if (custom_key && custom_key.trim() !== '') {
+            const existing = await db.query('SELECT id FROM scripts WHERE script_key = $1', [key]);
+            if (existing.length > 0) {
+                return res.status(400).json({ status: 'error', message: 'Esa key ya existe. Usa otra o deja el campo vacio para generar una nueva.' });
+            }
+        }
+        
         const port = puerto || '22003';
         const dur = duracion || 'permanente';
         const fechaExp = calcularExpiracion(dur);
@@ -85,18 +96,32 @@ router.post('/', async (req, res) => {
 });
 router.put('/:id', async (req, res) => {
     try {
-        const { nombre, ip_servidor, puerto } = req.body;
+        const { nombre, ip_servidor, puerto, script_key } = req.body;
         const id = req.params.id;
         const rows = await db.query('SELECT * FROM scripts WHERE id = $1', [id]);
         if (rows.length === 0) {
             return res.status(404).json({ status: 'error', message: 'Script no encontrado' });
         }
+        
+        // Si se proporciona una nueva key, verificar que no exista
+        if (script_key && script_key.trim() !== '') {
+            const newKey = script_key.trim().toUpperCase();
+            const existing = await db.query('SELECT id FROM scripts WHERE script_key = $1 AND id != $2', [newKey, id]);
+            if (existing.length > 0) {
+                return res.status(400).json({ status: 'error', message: 'Esa key ya existe en otro script' });
+            }
+        }
+        
         const updates = [];
         const params = [];
         let paramIdx = 1;
         if (nombre) { updates.push(`nombre = $${paramIdx++}`); params.push(nombre); }
         if (ip_servidor !== undefined) { updates.push(`ip_servidor = $${paramIdx++}`); params.push(ip_servidor); }
         if (puerto) { updates.push(`puerto = $${paramIdx++}`); params.push(puerto); }
+        if (script_key && script_key.trim() !== '') { 
+            updates.push(`script_key = $${paramIdx++}`); 
+            params.push(script_key.trim().toUpperCase()); 
+        }
         if (updates.length > 0) {
             params.push(id);
             await db.query(`UPDATE scripts SET ${updates.join(', ')} WHERE id = $${paramIdx}`, params);
